@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>AQI MVP Map</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+  <style>
+    html,body,#map { height: 100%; margin:0; padding:0; }
+    .info { position: absolute; z-index: 400; top: 10px; left: 10px; background: white; padding: 8px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <h1>AI Driven Pollution Source Identification Forecasting & Policy</h1>
+  <div id="map"></div>
+  <div id="info" class="info"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([28.7, 77.1], 10); // default Delhi
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: 'Map data © OpenStreetMap contributors'
+    }).addTo(map);
+    
+    // Click on map to fetch AQI and forecast
+    map.on('click', async function(e) {
+      const lat = e.latlng.lat.toFixed(4);
+      const lon = e.latlng.lng.toFixed(4);
+
+      // Fetch AQI
+      const res = await fetch(`/aqi?lat=${lat}&lon=${lon}`);
+      const data = await res.json();
+    // Show popup on map
+      L.popup()
+        .setLatLng(e.latlng)
+        .setContent(`
+          <b>AQI: ${data.aqi_category}</b><br>
+          PM2.5: ${data.pm25.toFixed(2)} µg/m³<br>
+          Sources:<br>
+          - Traffic: ${data.source.traffic_frac*100}%<br>
+          - Industry: ${data.source.industry_frac*100}%<br>
+          - Stubble: ${data.source.stubble_frac*100}%<br>
+          Policies:<br>
+          ${data.policy.join('<br>')}
+        `)
+        .openOn(map);
+      // Fetch forecast
+      const forecastRes = await fetch(`/forecast?lat=${lat}&lon=${lon}&hours=24`);
+      const forecastData = await forecastRes.json();
+
+      let forecastHtml = '<h3>24h Forecast</h3><ul>';
+      forecastData.forecasts.forEach(f => {
+        forecastHtml += `<li>${f.timestamp}: ${f.pm25.toFixed(1)} µg/m³ (${f.aqi_category})</li>`;
+      });
+      forecastHtml += '</ul>';
+
+      document.getElementById('info').innerHTML = forecastHtml;
+    });
+  </script>
+  <script src="app.js"></script>
+
+</body>
+</html>
